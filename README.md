@@ -1,24 +1,25 @@
 # DSAN 6700 ML Service
 
-This is a minimal Python web-service framework created for **DSAN 6700 Homework 1** by Shuchen Liu, Zejun Xu, Peipei Ji.
-
-## Homework 1 Scope
-HW1 focuses on building a reproducible software-engineering framework around a Python service, including:
-
-- Python package structure
-- dependency and environment management
-- typed configuration
-- FastAPI service startup
-- automated testing
-- linting, formatting, and type checking
-- pre-commit checks
-- GitHub Actions continuous integration
-- team collaboration and documentation
-
-The repository currently contains a working FastAPI service with a typed `GET /health` endpoint. It does not contain a trained machine-learning model or prediction functionality. In other words, HW1 builds the software framework and validation pipeline that a future ML application could use.
+**A minimal FastAPI project created for DSAN 6700 Homework 1 for Peipei Ji, Shuchen Liu, Zejun Xu.**
 
 
-## Project Structure
+# HW1 Scope
+
+The purpose of this project is to build a reproducible Python web service workflow, including project setup, dependency management, environment configuration, testing, code-quality checks, and continuous integration.
+
+The project currently includes:
+
+* Python package structure
+* dependency management with `uv`
+* environment configuration with Pydantic Settings
+* FastAPI service
+* `/health` endpoint
+* Ruff, Mypy, Pytest, and pre-commit
+* GitHub Actions continuous integration
+
+The project does not currently include a trained machine-learning model or `/predict` endpoint.
+
+# Project Structure
 
 ```text
 .
@@ -28,13 +29,11 @@ The repository currently contains a working FastAPI service with a typed `GET /h
 │   └── workflows/
 │       └── ci.yml
 ├── .pre-commit-config.yaml
-├── .python-version
 ├── pyproject.toml
 ├── README.md
 ├── uv.lock
 ├── src/
 │   └── dsan6700_ml_service/
-│       ├── __init__.py
 │       ├── api.py
 │       └── config.py
 └── tests/
@@ -42,80 +41,68 @@ The repository currently contains a working FastAPI service with a typed `GET /h
     └── test_config.py
 ```
 
-Main responsibilities of these files:
 
-- `pyproject.toml` defines the package, Python requirement, dependencies, build system, and tool configuration.
-- `uv.lock` records the resolved dependency versions for reproducible installation.
-- `api.py` defines the FastAPI application and health endpoint.
-- `config.py` defines typed application settings using Pydantic Settings.
-- `tests/` contains automated behavior and configuration tests.
-- `.pre-commit-config.yaml` defines checks that can run before commits.
-- `.github/workflows/ci.yml` defines the automated GitHub Actions validation workflow.
-- `README.md` explains how another developer can reproduce, run, and check the project.
+# How to Reproduce and Run the Project
 
----
-## Reproduce and Run the Project from Scratch
+The steps below explain how to set up the project on a new computer.
 
-The steps below follow the order a new developer would use to reproduce the project on another computer.
+All commands shown in code blocks should be **copied into a Terminal window and executed by pressing Enter**.
 
-### Step 1 — Prepare Python 3.12 and `uv`
+## Step 1 — Check the Required Tools
 
-This project uses **Python 3.12** in continuous integration and requires Python `>=3.12`.
+This project requires:
 
-It also uses **`uv`** to manage the Python environment and project dependencies.
+* Python 3.12 or later
+* `uv`
+* Git
 
-Check that both are available:
+Open Terminal and run:
 
 ```bash
 python --version
 uv --version
+git --version
 ```
 
-Why they are needed:
+These commands check whether Python, `uv`, and Git are available on your computer.
 
-- **Python 3.12** provides the runtime used to execute the project.
-- **`uv`** creates the project environment and installs the dependencies defined by `pyproject.toml` and `uv.lock`.
+## Step 2 — Download the Project from GitHub
 
----
-
-### Step 2 — Clone the Repository
-
-Clone the GitHub repository and enter the project directory:
+In Terminal, copy and run:
 
 ```bash
 git clone https://github.com/Zejun-Derry-Xu/dsan6700-ml-service.git
+```
+
+This downloads the repository to your computer.
+
+Then enter the project folder:
+
+```bash
 cd dsan6700-ml-service
 ```
 
-Cloning creates a local copy of the project, including its source code, configuration files, tests, dependency lockfile, and Git history.
+The remaining commands should be run from inside this folder.
 
----
+## Step 3 — Install the Project Dependencies
 
-### Step 3 — Install the Project and Dependencies
-
-Install the runtime and development dependencies using the committed lockfile:
+Run:
 
 ```bash
 uv sync --extra dev --frozen
 ```
 
-This command has three important parts:
+This installs the packages required to run and check the project.
 
-- `uv sync` creates or updates the project environment and installs its dependencies.
-- `--extra dev` also installs development tools such as Ruff, Mypy, Pytest, and pre-commit.
-- `--frozen` requires the installation to follow the existing `uv.lock` instead of changing dependency versions.
+The command uses the committed `uv.lock` file so that team members and GitHub Actions use the same resolved dependency versions.
 
-Using the lockfile helps the team and GitHub Actions work with the same resolved dependency versions.
-
-Install the Git pre-commit hooks after the dependencies are available:
+Then install the pre-commit hooks:
 
 ```bash
 uv run pre-commit install
 ```
 
----
-
-### Step 4 — Understand and Set the Environment Configuration
+## Step 4 — Set the Environment Configuration
 
 Application settings are defined in:
 
@@ -123,28 +110,24 @@ Application settings are defined in:
 src/dsan6700_ml_service/config.py
 ```
 
-The project currently supports three settings:
+The project currently uses three environment variables:
 
-| Environment variable | Purpose | Allowed values / default |
-| --- | --- | --- |
-| `APP_NAME` | Name of the application | Default: `DSAN 6700 ML Service` |
-| `APP_ENV` | Current application environment | `development`, `testing`, or `production`; default: `development` |
-| `LOG_LEVEL` | Logging level | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`; default: `INFO` |
+| Variable    | Purpose                                                        |
+| ----------- | -------------------------------------------------------------- |
+| `APP_NAME`  | Application name                                               |
+| `APP_ENV`   | Current environment: `development`, `testing`, or `production` |
+| `LOG_LEVEL` | Logging level such as `DEBUG` or `INFO`                        |
 
-Two example configuration files are included:
+The repository includes two example configuration files:
 
 ```text
 .env.development.example
 .env.production.example
 ```
 
-These files are **templates** showing which environment variables the project expects and what development or production values may look like. They do not contain real secrets.
+These are **example templates** showing what the configuration should look like. They do not contain private information and are not automatically loaded by the current application.
 
-For example, `.env.development.example` contains development-style values, while `.env.production.example` contains production-style values.
-
-The current `Settings` class reads values from the **process environment**. The example files are therefore references; they are not automatically loaded by the application.
-
-To set the development values manually on macOS or Linux, run:
+For local development on macOS or Linux, copy the following commands into Terminal:
 
 ```bash
 export APP_NAME="DSAN 6700 ML Service"
@@ -152,152 +135,125 @@ export APP_ENV="development"
 export LOG_LEVEL="DEBUG"
 ```
 
-If no environment variables are provided, the defaults in `Settings` are used.
+If these variables are not set, the default values defined in `Settings` are used.
 
-Pydantic validates the settings when `Settings` is created. For example, an unsupported value such as:
+Invalid configuration values are rejected by Pydantic Settings.
+
+For example, `APP_ENV` must be one of:
 
 ```text
-APP_ENV=banana
+development
+testing
+production
 ```
 
-is rejected because `APP_ENV` only accepts `development`, `testing`, or `production`.
+**Do not upload private configuration to GitHub**, including:
 
-#### Do not commit secrets
+* passwords
+* API tokens
+* private keys
+* database credentials
+* real `.env` files containing sensitive values
 
-Do not commit real private configuration to the repository, including:
+The `.env.development.example` and `.env.production.example` files should contain example values only.
 
-- passwords
-- API tokens
-- SSH private keys
-- database credentials
-- real `.env` files containing sensitive values
+## Step 5 — Start the FastAPI Service
 
-The committed `.env.development.example` and `.env.production.example` files should contain only safe example values.
-
----
-
-### Step 5 — Start the FastAPI Service
-
-Start the local development server with Uvicorn:
+In Terminal, run:
 
 ```bash
 uv run uvicorn dsan6700_ml_service.api:app --reload
 ```
 
-Here:
+This starts the FastAPI application on your computer.
 
-- **FastAPI** defines the web application and its endpoints.
-- **Uvicorn** runs the application as a local web server and listens for HTTP requests.
-- `--reload` restarts the development server automatically when Python source files change.
-
-The service should be available at:
+If the server starts successfully, it will normally be available at:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Stop the server with `Ctrl+C`.
+Keep this Terminal window open while the server is running.
 
----
-
-### Step 6 — Check the Health Endpoint
-
-The current API exposes one endpoint:
+To stop the server later, press:
 
 ```text
-GET /health
+Ctrl + C
 ```
 
-With the FastAPI server running, open another terminal and run:
+## Step 6 — Check the Health Endpoint
+
+While the FastAPI server is still running, open a **second Terminal window**.
+
+Run:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-Expected response:
+You should receive:
 
 ```json
 {"status":"healthy"}
 ```
 
-A successful request returns HTTP status `200`.
+This means the FastAPI service is running and responding correctly.
 
-The health endpoint is intentionally simple. Its purpose is to confirm that the web service can start and respond correctly; it does not perform machine-learning prediction.
+The `/health` endpoint only checks whether the service is working. It does not perform machine-learning prediction.
 
----
+## Step 7 — Run the Project Checks
 
-### Step 7 — Run Tests and Code-Quality Checks
+The following commands check different parts of the project.
 
-Before committing changes, run the project checks locally.
+Run them from the project folder in Terminal.
 
-#### Ruff lint
+### Check code quality with Ruff
 
 ```bash
 uv run ruff check src/ tests/
 ```
 
-Ruff lint checks the Python source and tests for common errors and rule violations.
-
-#### Ruff format check
+### Check code formatting with Ruff
 
 ```bash
 uv run ruff format --check src/ tests/
 ```
 
-This checks whether the Python files follow the project's formatting rules without modifying them.
-
-#### Mypy
+### Check Python types with Mypy
 
 ```bash
 uv run mypy src/
 ```
 
-Mypy checks whether the Python type hints are internally consistent.
-
-#### Pytest
+### Run automated tests with Pytest
 
 ```bash
 uv run pytest
 ```
 
-The current tests verify that:
+The current tests check:
 
-- `GET /health` returns HTTP `200` and `{"status": "healthy"}`.
-- an invalid `APP_ENV` value is rejected by the `Settings` model.
+* whether `/health` returns HTTP `200` and `{"status": "healthy"}`
+* whether an invalid `APP_ENV` value is rejected
 
-#### pre-commit
-
-Run all configured pre-commit hooks manually with:
+### Run all pre-commit checks
 
 ```bash
 uv run pre-commit run --all-files
 ```
 
-The pre-commit configuration runs Ruff checks and formatting and also performs basic repository checks such as YAML validation, large-file detection, private-key detection, end-of-file fixing, and trailing-whitespace cleanup.
+These checks help catch code-quality, formatting, type, and testing problems before changes are submitted.
 
-Together, these tools check different parts of the project:
 
-- **Ruff** checks code quality and formatting.
-- **Mypy** checks type consistency.
-- **Pytest** checks actual program behavior.
-- **pre-commit** runs selected checks before changes are committed to Git history.
+# Continuous Integration
 
----
-
-## Continuous Integration with GitHub Actions
-
-The repository includes:
+The repository also includes a GitHub Actions workflow:
 
 ```text
 .github/workflows/ci.yml
 ```
 
-GitHub Actions automatically runs the CI workflow on both:
-
-- `push`
-- `pull_request`
-
-The workflow creates a clean Ubuntu runner, sets up Python 3.12 and `uv`, installs the project from the frozen lockfile, and then runs:
+Whenever code is pushed to GitHub or a Pull Request is created, GitHub automatically creates a clean environment and runs:
 
 ```bash
 uv sync --extra dev --frozen
@@ -307,6 +263,6 @@ uv run mypy src/
 uv run pytest
 ```
 
-This provides an independent check that the project can be installed and validated outside an individual team member's local computer.
+This checks that the project works outside an individual team member's computer.
 
-A green GitHub Actions run means all checks in the workflow completed successfully.
+A green GitHub Actions result means all configured CI checks passed.
