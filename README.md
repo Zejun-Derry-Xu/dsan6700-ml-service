@@ -1,6 +1,6 @@
 # DSAN 6700 ML Service
 
-**A minimal FastAPI project created for DSAN 6700 Homework 1 for Peipei Ji, Shuchen Liu, Zejun Xu.**
+**A minimal FastAPI project created for DSAN 6700 Homework 1 by Peipei Ji, Shuchen Liu, Zejun Xu.**
 
 
 # HW1 Scope
