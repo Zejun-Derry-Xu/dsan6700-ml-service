@@ -3,6 +3,8 @@ from typing import Literal
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from dsan6700_ml_service.config import Settings
+
 
 class HealthResponse(BaseModel):
     """Response returned by the health-check endpoint."""
@@ -10,8 +12,10 @@ class HealthResponse(BaseModel):
     status: Literal["healthy"]
 
 
+settings = Settings()
+
 app = FastAPI(
-    title="DSAN 6700 ML Service",
+    title=settings.app_name,
     version="0.1.0",
 )
 
