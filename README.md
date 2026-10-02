@@ -1,268 +1,238 @@
 # DSAN 6700 ML Service
 
-**A minimal FastAPI project created for DSAN 6700 Homework 1 by Peipei Ji, Shuchen Liu, Zejun Xu.**
+A FastAPI classification service built for DSAN 6700 by Peipei Ji,
+Shuchen Liu, and Zejun Xu. Homework 2 continues the project from Homework 1
+in the same repository.
 
+## Current Features
 
-# HW1 Scope
+- Installable Python package and locked dependencies managed with `uv`.
+- Environment configuration with Pydantic Settings.
+- A trained Iris classifier: `StandardScaler` and `LogisticRegression`.
+- Model loading once per application startup and reuse across requests.
+- `GET /health` and `POST /predict` endpoints.
+- API tests using an injected fake model client.
+- Ruff, Mypy, Pytest, pre-commit, and GitHub Actions.
 
-The purpose of this project is to build a reproducible Python web service workflow, including project setup, dependency management, environment configuration, testing, code-quality checks, and continuous integration.
-
-The project currently includes:
-
-* Python package structure
-* dependency management with `uv`
-* environment configuration with Pydantic Settings
-* FastAPI service
-* `/health` endpoint
-* Ruff, Mypy, Pytest, and pre-commit
-* GitHub Actions continuous integration
-
-The project does not currently include a trained machine-learning model or `/predict` endpoint.
-
-# Project Structure
+## Project Structure
 
 ```text
 .
 ├── .env.development.example
 ├── .env.production.example
-├── .github/
-│   └── workflows/
-│       └── ci.yml
+├── .github/workflows/ci.yml
 ├── .pre-commit-config.yaml
 ├── pyproject.toml
-├── README.md
 ├── uv.lock
-├── src/
-│   └── dsan6700_ml_service/
-│       ├── api.py
-│       └── config.py
+├── README.md
+├── scripts/
+│   └── train_model.py
+├── artifacts/
+│   └── iris.joblib             # Generated locally; ignored by Git
+├── src/dsan6700_ml_service/
+│   ├── __init__.py
+│   ├── api.py
+│   ├── config.py
+│   ├── model_client.py
+│   └── schemas.py
 └── tests/
     ├── test_api.py
     └── test_config.py
 ```
 
+## Local Setup and Run Instructions
 
-# How to Reproduce and Run the Project
+### 1. Check the Required Tools
 
-The steps below explain how to set up the project on a new computer.
-
-All commands shown in code blocks should be **copied into a Terminal window and executed by pressing Enter**.
-
-## Step 1 — Check the Required Tools
-
-This project requires:
-
-* Python 3.12 or later
-* `uv`
-* Git
-
-Open Terminal and run:
+Install Git and `uv`. The project requires Python 3.12 or later; CI runs
+on Python 3.12, which is also specified in `.python-version`.
 
 ```bash
-python --version
-uv --version
 git --version
+uv --version
 ```
 
-These commands check whether Python, `uv`, and Git are available on your computer.
-
-## Step 2 — Download the Project from GitHub
-
-In Terminal, copy and run:
+### 2. Clone the Repository
 
 ```bash
 git clone https://github.com/Zejun-Derry-Xu/dsan6700-ml-service.git
-```
-
-This downloads the repository to your computer.
-
-Then enter the project folder:
-
-```bash
 cd dsan6700-ml-service
 ```
 
-The remaining commands should be run from inside this folder.
+Run the remaining setup and server commands from the repository root.
+While reviewing the classification PR before it is merged, first switch
+to its branch:
 
-## Step 3 — Install the Project Dependencies
+```bash
+git switch feature/iris-classifier
+```
 
-Run:
+### 3. Install Dependencies
 
 ```bash
 uv sync --extra dev --frozen
-```
-
-This installs the packages required to run and check the project.
-
-The command uses the committed `uv.lock` file so that team members and GitHub Actions use the same resolved dependency versions.
-
-Then install the pre-commit hooks:
-
-```bash
 uv run pre-commit install
 ```
 
-## Step 4 — Set the Environment Configuration
+`--frozen` installs the versions recorded in `uv.lock`. The `dev` extra
+includes the tools used for tests and code-quality checks.
 
-Application settings are defined in:
+### 4. Configure the Application
 
-```text
-src/dsan6700_ml_service/config.py
-```
+Settings are defined in `src/dsan6700_ml_service/config.py` and read
+during application startup.
 
-The project currently uses three environment variables:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `APP_NAME` | `DSAN 6700 ML Service` | Application title |
+| `APP_ENV` | `development` | One of `development`, `testing`, or `production` |
+| `LOG_LEVEL` | `INFO` | Logging-level setting; accepts `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
+| `MODEL_PATH` | `artifacts/iris.joblib` | Saved model artifact to load |
+| `INFERENCE_DELAY_SECONDS` | `0.0` | Reserved for the upcoming concurrency audit; the current endpoint does not apply this delay |
 
-| Variable    | Purpose                                                        |
-| ----------- | -------------------------------------------------------------- |
-| `APP_NAME`  | Application name                                               |
-| `APP_ENV`   | Current environment: `development`, `testing`, or `production` |
-| `LOG_LEVEL` | Logging level such as `DEBUG` or `INFO`                        |
+The application reads `.env` from the working directory when it exists.
+Environment variables override values in `.env`; otherwise defaults apply.
+The example files are templates, so their names are not loaded directly.
 
-The repository includes two example configuration files:
-
-```text
-.env.development.example
-.env.production.example
-```
-
-These are **example templates** showing what the configuration should look like. They do not contain private information and are not automatically loaded by the current application.
-
-For local development on macOS or Linux, copy the following commands into Terminal:
+Default settings are sufficient for the commands below. To create an
+optional development configuration, copy the example if you do not
+already have a `.env` file:
 
 ```bash
-export APP_NAME="DSAN 6700 ML Service"
-export APP_ENV="development"
-export LOG_LEVEL="DEBUG"
+cp .env.development.example .env
 ```
 
-If these variables are not set, the default values defined in `Settings` are used.
+The new model settings can be added to that file when needed:
 
-Invalid configuration values are rejected by Pydantic Settings.
-
-For example, `APP_ENV` must be one of:
-
-```text
-development
-testing
-production
+```dotenv
+MODEL_PATH=artifacts/iris.joblib
+INFERENCE_DELAY_SECONDS=0
 ```
 
-**Do not upload private configuration to GitHub**, including:
+Relative model paths resolve from the working directory. Keep real
+environment files and secrets out of Git. The example files must contain
+example values only. Existing application validators reject invalid
+configuration such as an unsupported `APP_ENV` or a blank `APP_NAME`.
+Additional model-configuration validation is a follow-up team task.
 
-* passwords
-* API tokens
-* private keys
-* database credentials
-* real `.env` files containing sensitive values
-
-The `.env.development.example` and `.env.production.example` files should contain example values only.
-
-## Step 5 — Start the FastAPI Service
-
-In Terminal, run:
+### 5. Generate the Model
 
 ```bash
-uv run uvicorn dsan6700_ml_service.api:app --reload
+uv run python scripts/train_model.py
 ```
 
-This starts the FastAPI application on your computer.
+The script loads the Iris dataset, makes a stratified 80/20 training/test
+split with seed 42, and trains a standardization/classification pipeline.
+It prints the held-out test accuracy and verifies a prediction after
+reloading the saved artifact.
 
-If the server starts successfully, it will normally be available at:
+`artifacts/iris.joblib` contains the fitted pipeline, class names, input
+feature order, and artifact format version. The directory is ignored by
+Git, so a fresh clone must generate the model before starting the service.
+Training and serving use the same locked dependency environment.
 
-```text
-http://127.0.0.1:8000
+To choose another output location, generate the artifact there and set
+`MODEL_PATH` to the same path:
+
+```bash
+uv run python scripts/train_model.py --output artifacts/another_model.joblib
 ```
 
-Keep this Terminal window open while the server is running.
+### 6. Start the Service
 
-To stop the server later, press:
-
-```text
-Ctrl + C
+```bash
+uv run uvicorn dsan6700_ml_service.api:app
 ```
 
-## Step 6 — Check the Health Endpoint
+Startup reads the settings and loads the real model once for this
+application process. Requests reuse that client. A missing model file
+causes startup to fail. Keep this terminal running and use a second
+terminal for the endpoint calls below. Press `Ctrl+C` to stop the service.
 
-While the FastAPI server is still running, open a **second Terminal window**.
+Interactive API documentation: <http://127.0.0.1:8000/docs>.
 
-Run:
+### 7. Call the Endpoints
+
+Check service health:
 
 ```bash
 curl http://127.0.0.1:8000/health
 ```
 
-You should receive:
+Expected response:
 
 ```json
 {"status":"healthy"}
 ```
 
-This means the FastAPI service is running and responding correctly.
+The health endpoint reports that the application is responding; it does
+not perform a prediction.
 
-The `/health` endpoint only checks whether the service is working. It does not perform machine-learning prediction.
+Predict the Iris class from four measurements in centimeters:
 
-## Step 7 — Run the Project Checks
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sepal_length": 5.1,
+    "sepal_width": 3.5,
+    "petal_length": 1.4,
+    "petal_width": 0.2
+  }'
+```
 
-The following commands check different parts of the project.
+Expected response with the generated model:
 
-Run them from the project folder in Terminal.
+```json
+{"class_id":0,"class_name":"setosa"}
+```
 
-### Check code quality with Ruff
+All four input fields are required. They are assembled in the training
+order: sepal length, sepal width, petal length, petal width. The model
+classes are `0 = setosa`, `1 = versicolor`, and `2 = virginica`.
+
+The current schema validates required fields and float conversion.
+Stricter measurement and unknown-field validation is a follow-up team task.
+
+## Quality Checks and Tests
 
 ```bash
 uv run ruff check src/ tests/
-```
-
-### Check code formatting with Ruff
-
-```bash
 uv run ruff format --check src/ tests/
-```
-
-### Check Python types with Mypy
-
-```bash
 uv run mypy src/
-```
-
-### Run automated tests with Pytest
-
-```bash
 uv run pytest
-```
-
-The current tests check:
-
-* whether `/health` returns HTTP `200` and `{"status": "healthy"}`
-* whether an invalid `APP_ENV` value is rejected
-
-### Run all pre-commit checks
-
-```bash
 uv run pre-commit run --all-files
 ```
 
-These checks help catch code-quality, formatting, type, and testing problems before changes are submitted.
+The current three tests cover:
 
+- The `/health` status and response.
+- `/predict` passing measurements to an injected fake client and returning
+  its result, even when `MODEL_PATH` points to a missing file.
+- Rejection of an invalid `APP_ENV` value.
 
-# Continuous Integration
+Tests do not require the generated model artifact. `create_app` accepts a
+fake client, and tests use `with TestClient(...)` to exercise the startup
+and shutdown lifecycle.
 
-The repository also includes a GitHub Actions workflow:
+## Continuous Integration
 
-```text
-.github/workflows/ci.yml
-```
+`.github/workflows/ci.yml` runs on every push and pull request. It installs
+dependencies from `uv.lock` and runs Ruff lint, Ruff formatting, Mypy, and
+Pytest. Check that the workflow is green before merging a PR.
 
-Whenever code is pushed to GitHub or a Pull Request is created, GitHub automatically creates a clean environment and runs:
+## Remaining Homework 2 Work
 
-```bash
-uv sync --extra dev --frozen
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
-uv run mypy src/
-uv run pytest
-```
+The classification service is the first implementation stage. Follow-up
+issues will add:
 
-This checks that the project works outside an individual team member's computer.
+- Strict configuration validation and startup-failure tests.
+- Strict prediction-input validation.
+- The ten-request blocking-call audit, baseline Git tag, responsiveness
+  test, and measured `discussion.md`.
+- Docker/Compose packaging, Jetstream2 deployment and recovery checks,
+  image/build/disk measurements, and deployment instructions.
+- GitHub issue templates and the remaining team review records.
 
-A green GitHub Actions result means all configured CI checks passed.
+Deployment and experiment instructions will be documented when those
+features and measurements are implemented.
