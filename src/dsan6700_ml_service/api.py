@@ -56,11 +56,11 @@ def create_app(model_client: ModelClient | None = None) -> FastAPI:
         return HealthResponse(status="healthy")
 
     @application.post("/predict", response_model=PredictResponse)
-    async def predict(
+    def predict(
         payload: PredictRequest,
         client: Annotated[ModelClient, Depends(get_model_client)],
     ) -> PredictResponse:
-        # Intentionally block the event loop for the audit.
+        # Run synchronous inference in FastAPI's worker thread pool.
         sleep(active_delay)
         return client.predict(payload)
 
