@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from time import sleep
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI
@@ -21,11 +22,13 @@ class HealthResponse(BaseModel):
 def create_app(model_client: ModelClient | None = None) -> FastAPI:
     """Create an application with a real or injected model client."""
     active_client: ModelClient | None = None
+    active_delay = 0.0
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        nonlocal active_client
+        nonlocal active_client, active_delay
         settings = Settings()
+        active_delay = settings.inference_delay_seconds
         application.title = settings.app_name
         active_client = (
             model_client
@@ -53,10 +56,12 @@ def create_app(model_client: ModelClient | None = None) -> FastAPI:
         return HealthResponse(status="healthy")
 
     @application.post("/predict", response_model=PredictResponse)
-    def predict(
+    async def predict(
         payload: PredictRequest,
         client: Annotated[ModelClient, Depends(get_model_client)],
     ) -> PredictResponse:
+        # Intentionally block the event loop for the audit.
+        sleep(active_delay)
         return client.predict(payload)
 
     return application

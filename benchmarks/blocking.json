@@ -1,0 +1,88 @@
+{
+  "label": "blocking",
+  "request_count": 10,
+  "total_seconds": 20.079,
+  "slowest_request_seconds": 20.0773,
+  "requests": [
+    {
+      "request": 1,
+      "seconds": 2.0112,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 2,
+      "seconds": 4.0201,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 3,
+      "seconds": 6.0275,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 4,
+      "seconds": 8.0348,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 5,
+      "seconds": 10.0422,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 6,
+      "seconds": 12.05,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 7,
+      "seconds": 14.0572,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 8,
+      "seconds": 16.0627,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 9,
+      "seconds": 18.0721,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    },
+    {
+      "request": 10,
+      "seconds": 20.0773,
+      "prediction": {
+        "class_id": 0,
+        "class_name": "setosa"
+      }
+    }
+  ]
+}
