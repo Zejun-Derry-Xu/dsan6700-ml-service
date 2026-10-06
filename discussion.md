@@ -86,3 +86,48 @@ prediction, and waits for the model to signal that inference has begun.
 It requires `/health` to return HTTP 200 within one second while the
 prediction remains unfinished. It then releases inference and checks the
 prediction response. No real artifact or external server is needed.
+
+
+## Docker packaging and build measurements
+
+The image installs runtime dependencies from uv.lock using
+uv sync --frozen before copying the application source. This allows
+the dependency layer to be reused when only source code changes.
+
+The Iris model is generated during the image build and loaded once
+at application startup. The container runs as the non-root app user
+and includes a health check against /health.
+
+Measurements were taken locally on an Apple Silicon Mac using
+Docker Desktop. One source-code line was changed: the module
+docstring in api.py. Both rebuilds used the same modified source.
+
+| Measurement | Result |
+| --- | ---: |
+| Image disk usage reported by docker image ls | 626 MB |
+| Image content size | 138 MB (138,273,392 bytes) |
+| Rebuild with layer cache | 3.95 seconds |
+| Rebuild with --no-cache | 9.72 seconds |
+
+Build times are the real wall-clock seconds reported by
+/usr/bin/time -p. The cached rebuild was approximately 2.46 times
+faster. The --no-cache run repeated build instructions but did not
+force existing base images to be downloaded again.
+
+The docker system df snapshot was:
+
+```text
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          7         3         17.82GB   735.4MB (4%)
+Containers      5         1         106.5kB   102.4kB (96%)
+Local Volumes   5         1         221.2MB   172.3MB (77%)
+Build Cache     224       0         21.27GB   19.95GB
+```
+
+This snapshot covers the entire local Docker installation, including
+other projects. It is not the disk usage of this service alone.
+
+The Compose stack contains only the API service. It requires no
+database, cache, or external model service. There is no mutable
+application data requiring a named volume; the model is included
+in the image. Compose configures restart: unless-stopped.

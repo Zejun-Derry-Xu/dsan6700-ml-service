@@ -1,4 +1,4 @@
-"""HTTP endpoints and application startup."""
+"""HTTP endpoints, application startup, and synchronous prediction."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
