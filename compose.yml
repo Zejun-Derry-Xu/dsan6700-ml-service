@@ -1,0 +1,13 @@
+services:
+  api:
+    build:
+      context: .
+    image: dsan6700-ml-service:local
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: "${APP_ENV:-production}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      MODEL_PATH: "${MODEL_PATH:-artifacts/iris.joblib}"
+      INFERENCE_DELAY_SECONDS: "${INFERENCE_DELAY_SECONDS:-0}"
+    restart: unless-stopped

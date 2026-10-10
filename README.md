@@ -281,6 +281,80 @@ and `--output benchmarks/blocking.json`. Restart the appropriate server
 before measuring a different version. Use `INFERENCE_DELAY_SECONDS=0`
 for normal operation.
 
+## Docker and Compose
+
+Install Docker Engine with the Compose plugin on Linux, or start Docker
+Desktop on macOS. Run the following commands from the repository root.
+The Docker files currently live on `feature/docker-deployment` until merged.
+
+```bash
+git switch feature/docker-deployment
+docker compose config --quiet
+docker compose up -d
+```
+
+On a fresh clone with no service image, Compose builds the image before
+starting the service. The image installs locked runtime dependencies and
+trains the Iris model during the build. Local Python, a local virtual
+environment, and a pre-existing model artifact are not needed.
+
+After changing source code, explicitly rebuild:
+
+```bash
+docker compose up -d --build
+```
+
+Inspect startup and health:
+
+```bash
+docker compose ps
+docker compose logs --tail 50 api
+curl -sS http://127.0.0.1:8000/health
+curl -sS -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+docker compose exec api id
+```
+
+Expected responses are `{"status":"healthy"}` and
+`{"class_id":0,"class_name":"setosa"}`. The container runs as user `app`
+with UID 10001. Health may initially show `starting` before becoming
+`healthy`. Port 8000 must be available; stop any local Uvicorn or old
+standalone API container using that port first.
+
+Compose passes APP_ENV, LOG_LEVEL, MODEL_PATH, and INFERENCE_DELAY_SECONDS
+at runtime, with defaults of production, INFO, artifacts/iris.joblib, and
+0. Values can be supplied through the shell or a local `.env` file;
+shell values take precedence for Compose interpolation. For example:
+
+```bash
+INFERENCE_DELAY_SECONDS=2 docker compose up -d
+```
+
+Real `.env` files are excluded from both Git and the Docker build context.
+Compose reads the file on the host and passes the listed variables into
+the container; the file itself is not copied into the image. Keep
+MODEL_PATH at its default unless the selected artifact exists inside the
+container. Return INFERENCE_DELAY_SECONDS to 0 for normal operation.
+
+The stack has one API service, no external dependencies, and no mutable
+application data requiring a volume. The model is included in the image.
+The Dockerfile provides a health check; Compose sets
+`restart: unless-stopped`. An unhealthy status alone does not restart a
+running container; the policy applies to process exits and Docker restarts.
+
+Stop or remove the Compose containers with:
+
+```bash
+docker compose stop
+docker compose down
+```
+
+These commands retain the built image. See [discussion.md](discussion.md)
+for measured image size, cached and uncached rebuild times, and Docker
+disk usage. Jetstream2 deployment, external access, and instance recovery
+remain to be verified.
+
 ## Remaining Homework 2 Work
 
 The model integration and local concurrency audit are implemented.
@@ -288,8 +362,8 @@ Remaining team work includes:
 
 - Strict configuration validation and startup-failure tests.
 - Strict prediction-input validation.
-- Docker/Compose packaging, Jetstream2 deployment and recovery checks,
-  image/build/disk measurements, and deployment instructions.
+- Jetstream2 deployment, external health access, instance recovery checks,
+  and cloud deployment instructions.
 - GitHub issue templates and the remaining team review records.
 
 Deployment instructions will be added after packaging and cloud validation.
