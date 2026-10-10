@@ -1,5 +1,6 @@
 """Application configuration."""
 
+import math
 from typing import Literal
 
 from pydantic import field_validator
@@ -28,4 +29,22 @@ class Settings(BaseSettings):
         """Reject an empty application name."""
         if not value.strip():
             raise ValueError("APP_NAME must not be empty")
+        return value
+
+    @field_validator("model_path")
+    @classmethod
+    def validate_model_path(cls, value: str) -> str:
+        """Reject an empty or whitespace-only model path."""
+        if not value.strip():
+            raise ValueError("MODEL_PATH must not be empty")
+        return value
+
+    @field_validator("inference_delay_seconds")
+    @classmethod
+    def validate_inference_delay(cls, value: float) -> float:
+        """Require a finite, non-negative inference delay."""
+        if not math.isfinite(value):
+            raise ValueError("INFERENCE_DELAY_SECONDS must be finite")
+        if value < 0:
+            raise ValueError("INFERENCE_DELAY_SECONDS must be non-negative")
         return value
