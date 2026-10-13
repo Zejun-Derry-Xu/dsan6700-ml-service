@@ -7,28 +7,35 @@ in the same repository.
 ## Current Features
 
 - Installable Python package and locked dependencies managed with `uv`.
-- Environment configuration with Pydantic Settings.
+- Environment configuration with Pydantic Settings that fails fast at
+  startup on invalid values.
 - A trained Iris classifier: `StandardScaler` and `LogisticRegression`.
 - Model loading once per application startup and reuse across requests.
-- `GET /health` and `POST /predict` endpoints.
+- `GET /health` and `POST /predict` endpoints, with validated prediction
+  input.
 - API tests using an injected fake model client.
 - A measured concurrency audit and a health responsiveness regression test.
+- A Docker image and a Compose stack for the Jetstream2 instance.
 - Ruff, Mypy, Pytest, pre-commit, and GitHub Actions.
 
 ## Project Structure
 
 ```text
 .
+├── .dockerignore
 ├── .env.development.example
 ├── .env.production.example
 ├── .github/workflows/ci.yml
 ├── .pre-commit-config.yaml
+├── Dockerfile
+├── compose.yml
 ├── pyproject.toml
 ├── uv.lock
 ├── README.md
 ├── scripts/
 │   ├── train_model.py
-│   └── benchmark_concurrency.py
+│   ├── benchmark_concurrency.py
+│   └── measure_docker.sh
 ├── benchmarks/
 │   ├── blocking.json
 │   └── fixed.json
@@ -44,7 +51,9 @@ in the same repository.
 └── tests/
     ├── test_api.py
     ├── test_config.py
-    └── test_responsiveness.py
+    ├── test_config_startup.py
+    ├── test_responsiveness.py
+    └── test_schemas.py
 ```
 
 ## Local Setup and Run Instructions
@@ -67,12 +76,6 @@ cd dsan6700-ml-service
 ```
 
 Run the remaining setup and server commands from the repository root.
-To review the current concurrency-audit work before it is merged, switch
-to its branch:
-
-```bash
-git switch feature/nonblocking-inference
-```
 
 ### 3. Install Dependencies
 
@@ -118,9 +121,10 @@ INFERENCE_DELAY_SECONDS=0
 
 Relative model paths resolve from the working directory. Keep real
 environment files and secrets out of Git. The example files must contain
-example values only. Existing application validators reject invalid
-configuration such as an unsupported `APP_ENV` or a blank `APP_NAME`.
-Additional model-configuration validation is a follow-up team task.
+example values only. Validators reject an unsupported `APP_ENV` or
+`LOG_LEVEL`, a blank `APP_NAME` or `MODEL_PATH`, and a negative or
+non-finite `INFERENCE_DELAY_SECONDS`. Any invalid value stops the
+application during startup instead of when the first request arrives.
 
 ### 5. Generate the Model
 
@@ -198,8 +202,20 @@ All four input fields are required. They are assembled in the training
 order: sepal length, sepal width, petal length, petal width. The model
 classes are `0 = setosa`, `1 = versicolor`, and `2 = virginica`.
 
-The current schema validates required fields and float conversion.
-Stricter measurement and unknown-field validation is a follow-up team task.
+Each measurement must be a finite number greater than zero; integers and
+floats are both accepted, and there is no upper limit. Missing fields,
+zero or negative values, nonnumeric strings, and unexpected or misspelled
+fields are rejected with HTTP 422. For example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"sepal_length":0,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
+
+The response lists each problem with its field and reason, here
+`greater_than` for `sepal_length`. The field descriptions and limits also
+appear in the interactive documentation at `/docs`.
 
 ## Quality Checks and Tests
 
@@ -211,13 +227,19 @@ uv run pytest
 uv run pre-commit run --all-files
 ```
 
-The current four tests cover:
+The tests cover:
 
-- The `/health` status and response.
-- `/predict` passing measurements to an injected fake client and returning
-  its result, even when `MODEL_PATH` points to a missing file.
-- Rejection of an invalid `APP_ENV` value.
-- `/health` responding while an injected slow prediction remains pending.
+- `test_api.py`: the `/health` response, and `/predict` passing
+  measurements to an injected fake client and returning its result, even
+  when `MODEL_PATH` points to a missing file.
+- `test_config.py`: accepted and rejected values for every setting.
+- `test_config_startup.py`: invalid environment settings prevent startup;
+  valid settings start the application with a fake client.
+- `test_responsiveness.py`: `/health` responds while an injected slow
+  prediction remains pending.
+- `test_schemas.py`: accepted measurements, feature order, and rejection of
+  missing, zero, negative, nonnumeric, NaN, infinite, and unexpected
+  input.
 
 Tests do not require the generated model artifact. `create_app` accepts a
 fake client. API tests use `with TestClient(...)`; the concurrency test
@@ -261,9 +283,8 @@ The recorded local measurements are:
 
 See [discussion.md](discussion.md) for the request-step table, explanation,
 and reproduction instructions. Raw measurements are in `benchmarks/`.
-The blocking version is preserved locally under the `blocking-baseline`
-Git tag; publish it with `git push origin blocking-baseline` so graders
-can retrieve it. To reproduce it without changing your current checkout:
+The blocking version is preserved under the `blocking-baseline` Git tag.
+To reproduce it without changing your current checkout:
 
 ```bash
 git fetch origin --tags
@@ -285,10 +306,10 @@ for normal operation.
 
 Install Docker Engine with the Compose plugin on Linux, or start Docker
 Desktop on macOS. Run the following commands from the repository root.
-The Docker files currently live on `feature/docker-deployment` until merged.
+To deploy on a Jetstream2 instance, follow
+[Deploy on Jetstream2](#deploy-on-jetstream2) instead.
 
 ```bash
-git switch feature/docker-deployment
 docker compose config --quiet
 docker compose up -d
 ```
@@ -352,20 +373,108 @@ docker compose down
 
 These commands retain the built image. See [discussion.md](discussion.md)
 for measured image size, cached and uncached rebuild times, and Docker
-disk usage. Jetstream2 deployment, external access, and instance recovery
-remain to be verified.
+disk usage.
 
-## Remaining Homework 2 Work
+## Deploy on Jetstream2
 
-The model integration and local concurrency audit are implemented.
-Remaining team work includes:
+These steps start the stack on a Jetstream2 Ubuntu instance from a fresh
+clone. `docker compose up -d` is the whole start procedure; no Python,
+virtual environment, or model artifact is needed on the instance.
 
-- Strict configuration validation and startup-failure tests.
-- Strict prediction-input validation.
-- Jetstream2 deployment, external health access, instance recovery checks,
-  and cloud deployment instructions.
-- GitHub issue templates and the remaining team review records.
+### 1. Open the Port
 
-Deployment instructions will be added after packaging and cloud validation.
-The audit branch must be reviewed and merged, and its baseline tag pushed,
-before the final submission.
+In Exosphere or Horizon, make sure the instance's security group allows
+inbound TCP traffic on port 8000. If `sudo ufw status` reports that the
+firewall is active on the instance, also run `sudo ufw allow 8000/tcp`.
+
+### 2. Install Docker on the Instance
+
+Connect to the instance (Exosphere instances use the `exouser` account):
+
+```bash
+ssh exouser@<INSTANCE_IP>
+```
+
+Check whether Docker Engine and the Compose plugin are already installed:
+
+```bash
+docker --version
+docker compose version
+```
+
+If either command fails, install Docker Engine with Docker's convenience
+script, let your user run Docker, and log in again:
+
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker "$USER"
+exit
+```
+
+After reconnecting, make sure the Docker daemon starts when the instance
+boots, which is what brings the stack back after an unshelve:
+
+```bash
+sudo systemctl enable --now docker
+```
+
+### 3. Clone and Start the Stack
+
+```bash
+git clone https://github.com/Zejun-Derry-Xu/dsan6700-ml-service.git
+cd dsan6700-ml-service
+docker compose up -d
+docker compose ps
+```
+
+The first start builds the image, which trains the model, so it takes
+longer than later starts. Wait until `docker compose ps` shows the `api`
+service as `healthy`.
+
+### 4. Call Every Endpoint from Outside the Instance
+
+Run these on your own computer, not on the instance:
+
+```bash
+export INSTANCE_IP=<INSTANCE_IP>
+
+curl -sS "http://$INSTANCE_IP:8000/health"
+
+curl -sS -X POST "http://$INSTANCE_IP:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{"sepal_length":5.1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+
+curl -sS -X POST "http://$INSTANCE_IP:8000/predict" \
+  -H "Content-Type: application/json" \
+  -d '{"sepal_length":-1,"sepal_width":3.5,"petal_length":1.4,"petal_width":0.2}'
+```
+
+Expected responses are `{"status":"healthy"}`,
+`{"class_id":0,"class_name":"setosa"}`, and an HTTP 422 validation error
+for the negative measurement. The interactive documentation is at
+`http://<INSTANCE_IP>:8000/docs`.
+
+### 5. Check Recovery After an Unshelve
+
+Shelve the instance in Exosphere, unshelve it, and wait for it to become
+ready. Without logging in or running any command on the instance, repeat
+the `/health` request from step 4. The Docker daemon starts at boot and
+`restart: unless-stopped` restarts the container, so the service returns
+on its own. A container stopped with `docker compose stop` or `down` is
+not restarted.
+
+### 6. Measure the Image and Rebuilds
+
+On the instance, from a clean checkout, run:
+
+```bash
+bash scripts/measure_docker.sh 2>&1 | tee docker-measurements.txt
+```
+
+The script reports the image size, the rebuild time after a one-line code
+change with and without the cached dependency layer, and
+`docker system df` after the stack is up. It temporarily appends a comment
+to `src/dsan6700_ml_service/__init__.py` and restores it before starting
+the stack from the committed source. The recorded results are in
+[discussion.md](discussion.md).

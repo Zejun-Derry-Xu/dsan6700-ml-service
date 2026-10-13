@@ -57,7 +57,7 @@ concurrency or faster CPU-bound model computation.
 
 Follow README.md for installing the locked development dependencies and
 training the model. The blocking version is preserved under Git tag
-`blocking-baseline`; the tag must be pushed to make it available remotely.
+`blocking-baseline`, which is published in the remote repository.
 README.md provides a separate-checkout procedure for reproducing that version.
 
 Start either version with:
