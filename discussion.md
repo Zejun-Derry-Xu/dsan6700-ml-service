@@ -57,7 +57,7 @@ concurrency or faster CPU-bound model computation.
 
 Follow README.md for installing the locked development dependencies and
 training the model. The blocking version is preserved under Git tag
-`blocking-baseline`; the tag must be pushed to make it available remotely.
+`blocking-baseline`, which is published in the remote repository.
 README.md provides a separate-checkout procedure for reproducing that version.
 
 Start either version with:
@@ -98,34 +98,53 @@ The Iris model is generated during the image build and loaded once
 at application startup. The container runs as the non-root app user
 and includes a health check against /health.
 
-Measurements were taken locally on an Apple Silicon Mac using
-Docker Desktop. One source-code line was changed: the module
-docstring in api.py. Both rebuilds used the same modified source.
+Measurements were taken on the team's Jetstream2 instance (Ubuntu
+24.04, x86_64, Docker Engine 29.1.3, Docker Compose 2.40.3) with
+`scripts/measure_docker.sh` at commit `cf0acf3`. The script appended
+one comment line to `src/dsan6700_ml_service/__init__.py`, timed both
+rebuilds against that same modified source, then restored the file and
+started the stack from the committed source.
 
 | Measurement | Result |
 | --- | ---: |
-| Image disk usage reported by docker image ls | 626 MB |
-| Image content size | 138 MB (138,273,392 bytes) |
-| Rebuild with layer cache | 3.95 seconds |
-| Rebuild with --no-cache | 9.72 seconds |
+| Image disk usage reported by docker image ls | 595 MB |
+| Image content size | 141 MB (141,234,463 bytes) |
+| Rebuild with cached dependency layer | 6.78 seconds |
+| Rebuild with --no-cache | 20.54 seconds |
 
-Build times are the real wall-clock seconds reported by
-/usr/bin/time -p. The cached rebuild was approximately 2.46 times
-faster. The --no-cache run repeated build instructions but did not
-force existing base images to be downloaded again.
+Build times are wall-clock seconds around `docker compose build`.
+The cached rebuild was approximately 3.0 times faster: only the
+layers from `COPY src/` onward were rebuilt, while the `uv sync`
+dependency layer was reused. The --no-cache run repeated every build
+instruction but did not download the base images again.
 
-The docker system df snapshot was:
+The docker system df snapshot after the stack was up was:
 
 ```text
 TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
-Images          7         3         17.82GB   735.4MB (4%)
-Containers      5         1         106.5kB   102.4kB (96%)
-Local Volumes   5         1         221.2MB   172.3MB (77%)
-Build Cache     224       0         21.27GB   19.95GB
+Images          5         5         2.811GB   2.811GB (100%)
+Containers      5         4         27.13MB   12.29kB (0%)
+Local Volumes   1         1         270.8MB   0B (0%)
+Build Cache     31        0         1.071GB   476.5MB
 ```
 
-This snapshot covers the entire local Docker installation, including
-other projects. It is not the disk usage of this service alone.
+This snapshot covers the entire Docker installation on the instance,
+including other containers and images on it. It is not the disk usage
+of this service alone.
+
+## Deployment on Jetstream2
+
+The stack was started on the instance from a clone of the repository
+with Compose. The container reported `healthy` and runs as
+`uid=10001(app)`. Requests sent from a computer outside the instance to
+`http://149.165.169.189:8000` returned:
+
+| Request | Response |
+| --- | --- |
+| `GET /health` | HTTP 200, `{"status":"healthy"}` |
+| `POST /predict` with valid measurements | HTTP 200, `{"class_id":0,"class_name":"setosa"}` |
+| `POST /predict` with `sepal_length` of -1 | HTTP 422, `greater_than` |
+| `POST /predict` with an unexpected field | HTTP 422 |
 
 The Compose stack contains only the API service. It requires no
 database, cache, or external model service. There is no mutable
