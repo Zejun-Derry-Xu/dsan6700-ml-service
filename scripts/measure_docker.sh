@@ -2,7 +2,7 @@
 # Build, start, and measure the Compose stack on the current host.
 #
 # Run from a clean checkout on the Jetstream2 instance:
-#   bash scripts/measure_docker.sh 2>&1 | tee docker-measurements.txt
+#   bash scripts/measure_docker.sh 2>&1 | tee ~/docker-measurements.txt
 #
 # The script temporarily appends one comment line to a source file to time
 # rebuilds after a one-line code change, then restores the file and starts
@@ -15,8 +15,8 @@ cd "$(dirname "$0")/.."
 CHANGED_FILE="src/dsan6700_ml_service/__init__.py"
 IMAGE="dsan6700-ml-service:local"
 
-if [[ -n "$(git status --porcelain)" ]]; then
-    echo "Working tree is not clean; commit or stash changes first." >&2
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    echo "Tracked files have changes; commit or stash them first." >&2
     exit 1
 fi
 

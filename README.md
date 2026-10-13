@@ -469,7 +469,7 @@ not restarted.
 On the instance, from a clean checkout, run:
 
 ```bash
-bash scripts/measure_docker.sh 2>&1 | tee docker-measurements.txt
+bash scripts/measure_docker.sh 2>&1 | tee ~/docker-measurements.txt
 ```
 
 The script reports the image size, the rebuild time after a one-line code
