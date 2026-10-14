@@ -343,20 +343,73 @@ with UID 10001. Health may initially show `starting` before becoming
 `healthy`. Port 8000 must be available; stop any local Uvicorn or old
 standalone API container using that port first.
 
-Compose passes APP_ENV, LOG_LEVEL, MODEL_PATH, and INFERENCE_DELAY_SECONDS
-at runtime, with defaults of production, INFO, artifacts/iris.joblib, and
-0. Values can be supplied through the shell or a local `.env` file;
-shell values take precedence for Compose interpolation. For example:
+### Runtime Environment File
+
+Use Docker Compose 2.24.0 or later. The service explicitly reads a host-side
+`.env` through `env_file`:
+
+```yaml
+env_file:
+  - path: .env
+    required: false
+```
+
+The file is optional so a fresh clone can still start with
+`docker compose up -d` and default settings. For an explicit production
+configuration, copy the committed example once, without replacing an
+existing local configuration:
+
+```bash
+if [ ! -f .env ]; then
+  cp .env.production.example .env
+fi
+```
+
+Edit `.env` on the machine running Docker. Its initial values are:
+
+```dotenv
+APP_NAME=DSAN 6700 ML Service
+APP_ENV=production
+LOG_LEVEL=INFO
+MODEL_PATH=artifacts/iris.joblib
+INFERENCE_DELAY_SECONDS=0
+```
+
+Validate the configuration and start the stack:
+
+```bash
+docker compose config --quiet
+docker compose up -d
+```
+
+Compose uses `.env` both for interpolation of the existing `environment`
+entries and to inject file values through `env_file`, including APP_NAME.
+The four explicit entries (APP_ENV, LOG_LEVEL, MODEL_PATH, and
+INFERENCE_DELAY_SECONDS) keep their defaults of production, INFO,
+artifacts/iris.joblib, and 0, and can be overridden from the shell:
 
 ```bash
 INFERENCE_DELAY_SECONDS=2 docker compose up -d
 ```
 
-Real `.env` files are excluded from both Git and the Docker build context.
-Compose reads the file on the host and passes the listed variables into
-the container; the file itself is not copied into the image. Keep
-MODEL_PATH at its default unless the selected artifact exists inside the
-container. Return INFERENCE_DELAY_SECONDS to 0 for normal operation.
+Changing `.env` changes startup configuration, not the image. After editing
+the file, recreate the API container to apply its values:
+
+```bash
+docker compose up -d --force-recreate api
+```
+
+A simple `docker compose restart` does not apply new environment values.
+No rebuild is required for a configuration-only change. Invalid application
+settings still fail during application startup; `config --quiet` checks
+Compose configuration, not the application's Pydantic validators.
+
+Real `.env` files are excluded from Git by `.gitignore` and from the build
+context by `.dockerignore`. Compose reads the file on the host and injects
+its values at runtime; the file is not copied or mounted into the image.
+Only the example files belong in Git. Keep MODEL_PATH at its default unless
+the selected artifact exists inside the container. Use
+INFERENCE_DELAY_SECONDS=0 for normal operation.
 
 The stack has one API service, no external dependencies, and no mutable
 application data requiring a volume. The model is included in the image.
@@ -378,8 +431,9 @@ disk usage.
 ## Deploy on Jetstream2
 
 These steps start the stack on a Jetstream2 Ubuntu instance from a fresh
-clone. `docker compose up -d` is the whole start procedure; no Python,
-virtual environment, or model artifact is needed on the instance.
+clone. After preparing runtime configuration, `docker compose up -d` is
+the whole start procedure; no Python, virtual environment, or model
+artifact is needed on the instance.
 
 ### 1. Open the Port
 
@@ -424,6 +478,9 @@ sudo systemctl enable --now docker
 ```bash
 git clone https://github.com/Zejun-Derry-Xu/dsan6700-ml-service.git
 cd dsan6700-ml-service
+cp .env.production.example .env
+# Edit .env for this instance before starting the service.
+docker compose config --quiet
 docker compose up -d
 docker compose ps
 ```
